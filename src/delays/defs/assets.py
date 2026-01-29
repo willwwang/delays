@@ -1,6 +1,8 @@
 import dagster as dg
-import duckdb
-import polars as pl
+import io
+import pandas as pd
+import requests
+import zipfile
 
 from nyct_gtfs import NYCTFeed
 
@@ -12,6 +14,7 @@ TRIP_COLUMNS = {
     "direction": "varchar",
     "location": "varchar",
     "location_status": "varchar",
+    "headsign_text": "varchar",
     "departure_time": "timestamp",
     "underway": "boolean",
     "train_assigned": "boolean",
@@ -29,7 +32,13 @@ UPDATE_COLUMNS = {
     "departure": "timestamp"
 }
 
-def extract_trips_data(trips, updated_at):
+five_min_partitions = dg.TimeWindowPartitionsDefinition(
+    start="2026-01-01-00:00",
+    cron_schedule="*/5 * * * *",  # Every 5 minutes
+    fmt="%Y-%m-%d-%H:%M",
+)
+
+def extract_trips_data(trips, updated_at) -> list[tuple]:
     return [
         (
             updated_at,
@@ -39,6 +48,7 @@ def extract_trips_data(trips, updated_at):
             trip.direction,
             trip.location,
             trip.location_status,
+            trip.headsign_text,
             trip.departure_time,
             trip.underway,
             trip.train_assigned,
@@ -49,7 +59,7 @@ def extract_trips_data(trips, updated_at):
         ) for trip in trips
     ]
 
-def extract_stop_time_update_data(update, trip_id, updated_at):
+def extract_stop_time_update_data(update, trip_id, updated_at) -> tuple:
     return (
         updated_at,
         trip_id,
@@ -58,8 +68,36 @@ def extract_stop_time_update_data(update, trip_id, updated_at):
         update.departure
     )
 
+def access_static_gtfs(url: str) -> bytes:
+    response = requests.get(url)
+    response.raise_for_status()
+    return response.content
+
+def extract_static_gtfs(zip: bytes) -> pd.DataFrame:
+    with zipfile.ZipFile(io.BytesIO(zip)) as zf:
+        stops_data = zf.read("stops.txt")  # Returns bytes
+
+    stops_df = pd.read_csv(io.BytesIO(stops_data))
+
+    return stops_df
+
 
 @dg.asset
+def raw_stops():
+    url = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip"
+    zip_bytes = access_static_gtfs(url)
+    stops_df = extract_static_gtfs(zip_bytes)
+
+    return stops_df
+
+
+@dg.multi_asset(
+    outs={
+        "raw_trips": dg.AssetOut(),
+        "raw_stop_time_updates": dg.AssetOut()
+    },
+    partitions_def=five_min_partitions
+)
 def trains():
     all_trips = []
     trip_updates = []
@@ -83,31 +121,14 @@ def trains():
                 ]
             trip_updates.extend(updates)
     
-    trips_df = pl.DataFrame(
+    raw_trips = pd.DataFrame(
         data=all_trips,
-        schema=TRIP_COLUMNS.keys(),
-        orient="row"
-    )
-    updates_df = pl.DataFrame(
-        data=trip_updates,
-        schema=UPDATE_COLUMNS.keys(),
-        orient="row"
+        columns=TRIP_COLUMNS.keys()
     )
 
-    with duckdb.connect("mta.duckdb") as conn:
-        conn.execute(
-            f"""
-            create table if not exists raw_trips (
-                {', '.join([f"{col} {TRIP_COLUMNS[col]}" for col in TRIP_COLUMNS])}
-            );
-            create table if not exists raw_stop_time_updates (
-                {', '.join([f"{col} {UPDATE_COLUMNS[col]}" for col in UPDATE_COLUMNS])}
-            );
-            """
-        )
-        conn.execute(
-            """
-            insert into raw_trips select * from trips_df;
-            insert into raw_stop_time_updates select * from updates_df;
-            """
-        )
+    raw_stop_time_updates = pd.DataFrame(
+        data=trip_updates,
+        columns=UPDATE_COLUMNS.keys()
+    )
+
+    return raw_trips, raw_stop_time_updates
