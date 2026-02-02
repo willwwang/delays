@@ -13,6 +13,8 @@ dependencies = [
     "dagster-duckdb>=0.28.8",
     "pandas==3.0",
     "dagster-duckdb-pandas>=0.28.8",
+    "dagster-gcp>=0.28.8",
+    "dagster-gcp-pandas>=0.28.8",
 ]
 
 [dependency-groups]
@@ -20,6 +22,7 @@ dev = [
     "dagster-webserver",
     "dagster-dg-cli",
     "pytest>=9.0.2",
+    "ipykernel>=7.1.0",
 ]
 
 [build-system]

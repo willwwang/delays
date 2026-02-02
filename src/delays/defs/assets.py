@@ -32,11 +32,18 @@ UPDATE_COLUMNS = {
     "departure": "timestamp"
 }
 
+STATIC_TABLES = {
+    "raw_stops": "stops.txt",
+    "raw_stop_times": "stop_times.txt"
+}
+
+
 five_min_partitions = dg.TimeWindowPartitionsDefinition(
     start="2026-01-01-00:00",
     cron_schedule="*/5 * * * *",  # Every 5 minutes
     fmt="%Y-%m-%d-%H:%M",
 )
+
 
 def extract_trips_data(trips, updated_at) -> list[tuple]:
     return [
@@ -73,28 +80,37 @@ def access_static_gtfs(url: str) -> bytes:
     response.raise_for_status()
     return response.content
 
-def extract_static_gtfs(zip: bytes) -> pd.DataFrame:
+def extract_static_gtfs(zip: bytes, tables: list[str]) -> pd.DataFrame:
+    table_data = []
     with zipfile.ZipFile(io.BytesIO(zip)) as zf:
-        stops_data = zf.read("stops.txt")  # Returns bytes
+        for table in tables:
+            table_data.append(zf.read(table))
 
-    stops_df = pd.read_csv(io.BytesIO(stops_data))
+    table_dfs = [pd.read_csv(io.BytesIO(data)) for data in table_data]
+    return table_dfs
 
-    return stops_df
-
-
-@dg.asset
-def raw_stops():
+@dg.multi_asset(
+    outs={table: dg.AssetOut() for table in STATIC_TABLES}
+)
+def static():
     url = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip"
+    tables = STATIC_TABLES
     zip_bytes = access_static_gtfs(url)
-    stops_df = extract_static_gtfs(zip_bytes)
-
-    return stops_df
-
+    
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        for table_name in tables:
+            table_data = zf.read(tables[table_name])
+            table_df = pd.read_csv(io.BytesIO(table_data))
+            yield dg.Output(table_df, output_name=table_name)
 
 @dg.multi_asset(
     outs={
-        "raw_trips": dg.AssetOut(),
-        "raw_stop_time_updates": dg.AssetOut()
+        "raw_trips": dg.AssetOut(
+            metadata={"partition_expr": "updated_at"}
+        ),
+        "raw_stop_time_updates": dg.AssetOut(
+            metadata={"partition_expr": "updated_at"}
+        )
     },
     partitions_def=five_min_partitions
 )
