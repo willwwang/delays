@@ -14,3 +14,5 @@ select
     num_stops_left,
     has_delay_alert
 from raw_trips
+where
+    underway is true

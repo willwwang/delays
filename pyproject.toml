@@ -15,6 +15,7 @@ dependencies = [
     "dagster-duckdb-pandas>=0.28.8",
     "dagster-gcp>=0.28.8",
     "dagster-gcp-pandas>=0.28.8",
+    "dbt-bigquery>=1.9.2",
 ]
 
 [dependency-groups]

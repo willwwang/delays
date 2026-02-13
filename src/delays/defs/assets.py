@@ -9,6 +9,7 @@ from nyct_gtfs import NYCTFeed
 TRIP_COLUMNS = {
     "updated_at": "timestamp",
     "trip_id": "varchar",
+    "nyc_train_id": "varchar",
     "start_date": "date",
     "route_id": "varchar",
     "direction": "varchar",
@@ -50,6 +51,7 @@ def extract_trips_data(trips, updated_at) -> list[tuple]:
         (
             updated_at,
             trip.trip_id,
+            trip.nyc_train_id,
             trip.start_date,
             trip.route_id,
             trip.direction,
