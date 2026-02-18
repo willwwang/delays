@@ -4,8 +4,9 @@ select
     start_date,
     route_id,
     direction,
-    location,
+    regexp_replace(location, r'[NS]$', '') as stop_id,
     location_status,
+    headsign_text,
     departure_time,
     underway,
     train_assigned,
@@ -13,6 +14,6 @@ select
     current_stop_sequence_index,
     num_stops_left,
     has_delay_alert
-from raw_trips
+from {{ source('raw', 'raw_trips') }}
 where
     underway is true
