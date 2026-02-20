@@ -2,18 +2,18 @@ sources:
   - name: raw
     dataset: delays
     tables:
-      - name: raw_trips
+      - name: raw_realtime__trips
         meta:
           dagster:
-            asset_key: ["raw_trips"]
+            asset_key: ["raw_realtime__trips"]
       - name: raw_stops
         meta:
           dagster:
             asset_key: ["raw_stops"]
-      - name: raw_stop_time_updates
+      - name: raw_realtime__stop_time_updates
         meta:
           dagster:
-            asset_key: ["raw_stop_time_updates"]
+            asset_key: ["raw_realtime__stop_time_updates"]
       - name: raw_stop_times
         meta:
           dagster:
