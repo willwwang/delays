@@ -6,15 +6,19 @@ sources:
         meta:
           dagster:
             asset_key: ["raw_realtime__trips"]
-      - name: raw_stops
+      - name: raw_static__stops
         meta:
           dagster:
-            asset_key: ["raw_stops"]
+            asset_key: ["raw_static__stops"]
       - name: raw_realtime__stop_time_updates
         meta:
           dagster:
             asset_key: ["raw_realtime__stop_time_updates"]
-      - name: raw_stop_times
+      - name: raw_static__stop_times
         meta:
           dagster:
-            asset_key: ["raw_stop_times"]
+            asset_key: ["raw_static__stop_times"]
+      - name: raw_static__trips
+        meta:
+          dagster:
+            asset_key: ["raw_static__trips"]

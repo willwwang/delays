@@ -1,6 +1,6 @@
 select
     stg_realtime__trips.updated_at,
-    stg_realtime__trips.service_id,
+    stg_realtime__trips.route_id,
     stg_realtime__trips.direction,
     stg_realtime__trips.location_status,
     stg_static__stops.stop_name,
