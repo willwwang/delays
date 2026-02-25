@@ -1,4 +1,5 @@
 import dagster as dg
+import datetime
 import io
 import pandas as pd
 import requests
@@ -62,9 +63,10 @@ five_min_partitions = dg.TimeWindowPartitionsDefinition(
 )
 
 
-def extract_trips_data(trips, updated_at) -> list[tuple]:
+def extract_trips_data(trips, partitioned_at, updated_at) -> list[tuple]:
     return [
         (
+            partitioned_at,
             updated_at,
             trip.trip_id,
             trip.nyc_train_id,
@@ -84,9 +86,9 @@ def extract_trips_data(trips, updated_at) -> list[tuple]:
         ) for trip in trips
     ]
 
-def extract_stop_time_update_data(update, trip_id, start_date, updated_at) -> tuple:
+def extract_stop_time_update_data(update, trip_id, start_date, partitioned_at) -> tuple:
     return (
-        updated_at,
+        partitioned_at,
         trip_id,
         start_date,
         update.stop_id,
@@ -150,25 +152,26 @@ def static():
 @dg.multi_asset(
     outs={
         "raw_realtime__trips": dg.AssetOut(
-            metadata={"partition_expr": "updated_at"}
+            metadata={"partition_expr": "partitioned_at"}
         ),
         "raw_realtime__stop_time_updates": dg.AssetOut(
-            metadata={"partition_expr": "updated_at"}
+            metadata={"partition_expr": "partitioned_at"}
         )
     },
     partitions_def=five_min_partitions
 )
-def trains():
+def trains(context: dg.AssetExecutionContext):
     all_trips = []
     trip_updates = []
+    partitioned_at = datetime.datetime.strptime(context.partition_key, "%Y-%m-%d-%H:%M")
 
     for source in ["1", "A", "B", "G", "J", "L", "N", "SIR"]:
         feed = NYCTFeed(source)
         trips = feed.trips
-        all_trips.extend(extract_trips_data(trips, feed.last_generated))
+        all_trips.extend(extract_trips_data(trips, partitioned_at, feed.last_generated))
         for trip in trips:
             updates = [
-                extract_stop_time_update_data(stop_time_update, trip.trip_id, trip.start_date, feed.last_generated)
+                extract_stop_time_update_data(stop_time_update, trip.trip_id, trip.start_date, partitioned_at)
                 for stop_time_update in trip.stop_time_updates
             ]
             trip_updates.extend(updates)
