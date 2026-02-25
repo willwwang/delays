@@ -8,6 +8,7 @@ import zipfile
 from nyct_gtfs import NYCTFeed
 
 TRIP_COLUMNS = {
+    "partitioned_at": "timestamp",
     "updated_at": "timestamp",
     "trip_id": "varchar",
     "nyc_train_id": "varchar",
@@ -27,7 +28,7 @@ TRIP_COLUMNS = {
 }
 
 UPDATE_COLUMNS = {
-    "updated_at": "timestamp",
+    "partitioned_at": "timestamp",
     "trip_id": "varchar",
     "start_date": "date",
     "stop_id": "varchar",
